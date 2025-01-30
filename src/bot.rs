@@ -93,13 +93,13 @@ impl Default for BotBuilder {
 }
 
 pub struct Bot {
-    pub username: String,
-    pub stream: TcpStream,
-    pub state: State,
+    username: String,
+    stream: TcpStream,
+    state: State,
 }
 
 impl Bot {
-    pub async fn run(&mut self) -> anyhow::Result<()> {
+    async fn run(&mut self) -> anyhow::Result<()> {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         self.respawn().await?;
 
@@ -111,18 +111,7 @@ impl Bot {
         }
     }
 
-    pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        self.stream.write_all(&[3, 0, 22, 0]).await?;
-        Ok(())
-    }
-
-    pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
-        let packet = Chat { message }.serialize_packet()?;
-        self.stream.write_all(&to_raw(packet)).await?;
-        Ok(())
-    }
-
-    pub async fn tick(&mut self) -> anyhow::Result<()> {
+    async fn tick(&mut self) -> anyhow::Result<()> {
         println!("Ticking Bot...");
 
         // 4. Get Full Packets
@@ -132,6 +121,17 @@ impl Bot {
         // 8. Tick Client
         // - Update Position
 
+        Ok(())
+    }
+
+    pub async fn respawn(&mut self) -> anyhow::Result<()> {
+        self.stream.write_all(&[3, 0, 22, 0]).await?;
+        Ok(())
+    }
+
+    pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
+        let packet = Chat { message }.serialize_packet()?;
+        self.stream.write_all(&to_raw(packet)).await?;
         Ok(())
     }
 }
