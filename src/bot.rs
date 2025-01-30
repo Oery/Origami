@@ -1,9 +1,6 @@
 use std::time::Duration;
 
-use kagami::minecraft::packets::handshake::client::SetProtocol;
-use kagami::minecraft::packets::login::client::LoginStart;
-use kagami::minecraft::packets::play::client::Chat;
-use kagami::minecraft::Packet;
+use kagami::minecraft::{packets, Packet};
 use kagami::tcp::State;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -55,7 +52,7 @@ impl BotBuilder {
     }
 
     async fn set_protocol(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
-        let packet = SetProtocol {
+        let packet = packets::handshake::client::SetProtocol {
             protocol_version: 47,
             server_host: self.host.clone(),
             server_port: self.port,
@@ -70,7 +67,7 @@ impl BotBuilder {
     }
 
     async fn login(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
-        let packet = LoginStart {
+        let packet = packets::login::client::LoginStart {
             username: self.username.clone(),
         };
 
@@ -129,7 +126,7 @@ impl Bot {
     }
 
     pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
-        let packet = Chat { message }.serialize_packet()?;
+        let packet = packets::play::client::Chat { message }.serialize_packet()?;
         self.tcp.stream.write_all(&to_raw(packet)).await?;
         Ok(())
     }
