@@ -8,13 +8,32 @@ use kagami::tcp::State;
 
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-pub struct OfflineBot {
-    pub username: String,
-    pub host: String,
-    pub port: u16,
+pub struct BotBuilder {
+    username: String,
+    host: String,
+    port: u16,
 }
 
-impl OfflineBot {
+impl BotBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_username(mut self, username: impl ToString) -> Self {
+        self.username = username.to_string();
+        self
+    }
+
+    pub fn with_host(mut self, host: impl ToString) -> Self {
+        self.host = host.to_string();
+        self
+    }
+
+    pub fn with_port(mut self, port: u16) -> Self {
+        self.port = port;
+        self
+    }
+
     pub async fn connect(self) -> anyhow::Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let mut stream = TcpStream::connect(addr).await?;
@@ -60,6 +79,16 @@ impl OfflineBot {
             .await?;
 
         Ok(())
+    }
+}
+
+impl Default for BotBuilder {
+    fn default() -> Self {
+        Self {
+            username: "minecraft_bot_1".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 25565,
+        }
     }
 }
 
