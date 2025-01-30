@@ -15,7 +15,7 @@ pub struct OfflineBot {
 }
 
 impl OfflineBot {
-    pub async fn connect(&self) -> anyhow::Result<()> {
+    pub async fn connect(self) -> anyhow::Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let mut stream = TcpStream::connect(addr).await?;
 
@@ -23,7 +23,7 @@ impl OfflineBot {
         self.login(&mut stream).await?;
 
         let mut bot = Bot {
-            username: self.username.clone(),
+            username: self.username,
             stream,
             state: State::Login,
         };
