@@ -1,6 +1,7 @@
 use bot::BotBuilder;
 
 mod bot;
+mod stream;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

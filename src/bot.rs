@@ -5,8 +5,9 @@ use kagami::minecraft::packets::login::client::LoginStart;
 use kagami::minecraft::packets::play::client::Chat;
 use kagami::minecraft::Packet;
 use kagami::tcp::State;
-
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+
+use crate::stream::Stream;
 
 pub struct BotBuilder {
     username: String,
@@ -43,8 +44,7 @@ impl BotBuilder {
 
         let mut bot = Bot {
             username: self.username,
-            stream,
-            state: State::Login,
+            tcp: Stream::new(stream),
         };
 
         if let Err(e) = bot.run().await {
@@ -94,8 +94,7 @@ impl Default for BotBuilder {
 
 pub struct Bot {
     username: String,
-    stream: TcpStream,
-    state: State,
+    tcp: Stream,
 }
 
 impl Bot {
@@ -125,13 +124,13 @@ impl Bot {
     }
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        self.stream.write_all(&[3, 0, 22, 0]).await?;
+        self.tcp.stream.write_all(&[3, 0, 22, 0]).await?;
         Ok(())
     }
 
     pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
         let packet = Chat { message }.serialize_packet()?;
-        self.stream.write_all(&to_raw(packet)).await?;
+        self.tcp.stream.write_all(&to_raw(packet)).await?;
         Ok(())
     }
 }
