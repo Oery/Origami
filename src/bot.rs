@@ -26,8 +26,6 @@ impl OfflineBot {
             username: self.username.clone(),
             stream,
             state: State::Login,
-            host: self.host.clone(),
-            port: self.port,
         };
 
         if let Err(e) = bot.run().await {
@@ -69,8 +67,6 @@ pub struct Bot {
     pub username: String,
     pub stream: TcpStream,
     pub state: State,
-    pub host: String,
-    pub port: u16,
 }
 
 impl Bot {
