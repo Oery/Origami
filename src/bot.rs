@@ -1,7 +1,10 @@
 use std::time::Duration;
 
+use kagami::minecraft::packets::login::server::LoginSuccess;
+use kagami::minecraft::packets::play;
 use kagami::minecraft::packets::play::client::{Chat, ClientCommand, ClientSettings};
-use kagami::minecraft::{packets, Packet};
+use kagami::minecraft::packets::play::server::UpdateHealth;
+use kagami::minecraft::{packets, Packet, Packets};
 use kagami::tcp::State;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -107,6 +110,24 @@ impl Bot {
 
     async fn tick(&mut self) -> anyhow::Result<()> {
         let packets = self.tcp.read_packets().await?;
+
+        for packet in packets {
+            match packet {
+                Packets::LoginSuccess(ctx) => {
+                    self.run_on_connect_events(ctx).await?;
+                }
+
+                Packets::UpdateHealth(ctx) => {
+                    self.run_on_health_update_events(ctx).await?;
+                }
+
+                Packets::ServerChat(ctx) => {
+                    self.run_on_chat_events(ctx).await?;
+                }
+
+                _ => {}
+            }
+        }
         // 7. User Events
         // 8. Tick Client
         // - Update Position
@@ -134,6 +155,36 @@ impl Bot {
 
     fn cmp(&self) -> i32 {
         self.tcp.compression_threshold
+    }
+
+    // EVENTS HANDLERS
+    async fn run_on_connect_events(&mut self, ctx: LoginSuccess) -> anyhow::Result<()> {
+        // FIXME: Packet is invalid if sent 1ms too early
+        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        self.send_settings().await?;
+        Ok(())
+    }
+
+    async fn run_on_death_events(&mut self) -> anyhow::Result<()> {
+        self.respawn().await?;
+        Ok(())
+    }
+
+    async fn run_on_health_update_events(&mut self, ctx: UpdateHealth) -> anyhow::Result<()> {
+        println!("Health: {}", ctx.health);
+
+        if ctx.health <= 0.0 {
+            println!("Health is 0, bot has died");
+            self.run_on_death_events().await?;
+        }
+
+        Ok(())
+    }
+
+    async fn run_on_chat_events(&mut self, ctx: play::server::Chat) -> anyhow::Result<()> {
+        println!("Chat: {}", ctx.message);
+
+        Ok(())
     }
 }
 
