@@ -60,7 +60,7 @@ impl BotBuilder {
         };
 
         stream
-            .write_all(&to_raw(packet.serialize_packet()?))
+            .write_all(&to_raw(packet.serialize_packet(0)?))
             .await?;
 
         Ok(())
@@ -72,7 +72,7 @@ impl BotBuilder {
         };
 
         stream
-            .write_all(&to_raw(packet.serialize_packet()?))
+            .write_all(&to_raw(packet.serialize_packet(0)?))
             .await?;
 
         Ok(())
@@ -108,11 +108,7 @@ impl Bot {
     }
 
     async fn tick(&mut self) -> anyhow::Result<()> {
-        println!("Ticking Bot...");
-
-        // 4. Get Full Packets
-        // 5. Deserialize Packets
-        // 6. System Events
+        let packets = self.tcp.read_packets().await?;
         // 7. User Events
         // 8. Tick Client
         // - Update Position
@@ -126,7 +122,8 @@ impl Bot {
     }
 
     pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
-        let packet = packets::play::client::Chat { message }.serialize_packet()?;
+        let packet = packets::play::client::Chat { message }
+            .serialize_packet(self.tcp.compression_threshold)?;
         self.tcp.stream.write_all(&to_raw(packet)).await?;
         Ok(())
     }
