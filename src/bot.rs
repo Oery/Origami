@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use kagami::minecraft::packets::play::client::ClientSettings;
+use kagami::minecraft::packets::play::client::{Chat, ClientCommand, ClientSettings};
 use kagami::minecraft::{packets, Packet};
 use kagami::tcp::State;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
@@ -97,12 +97,6 @@ pub struct Bot {
 
 impl Bot {
     async fn run(&mut self) -> anyhow::Result<()> {
-        // TODO: This should be in a future on_connect event
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        self.respawn().await?;
-        self.send_settings().await?;
-        // TODO
-
         let mut interval = tokio::time::interval(Duration::from_millis(50));
 
         loop {
@@ -121,21 +115,25 @@ impl Bot {
     }
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        self.tcp.stream.write_all(&[3, 0, 22, 0]).await?;
+        let packet = ClientCommand::respawn().serialize_raw(self.cmp())?;
+        self.tcp.stream.write_all(&packet).await?;
         Ok(())
     }
 
-    pub async fn chat(&mut self, message: String) -> anyhow::Result<()> {
-        let packet = packets::play::client::Chat { message }
-            .serialize_packet(self.tcp.compression_threshold)?;
-        self.tcp.stream.write_all(&to_raw(packet)).await?;
+    pub async fn chat(&mut self, message: &str) -> anyhow::Result<()> {
+        let packet = Chat::new(message).serialize_raw(self.cmp())?;
+        self.tcp.stream.write_all(&packet).await?;
         Ok(())
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
-        let packet = ClientSettings::default().serialize_packet(256)?;
-        self.tcp.stream.write_all(&to_raw(packet)).await?;
+        let packet = ClientSettings::default().serialize_raw(256)?;
+        self.tcp.stream.write_all(&packet).await?;
         Ok(())
+    }
+
+    fn cmp(&self) -> i32 {
+        self.tcp.compression_threshold
     }
 }
 
