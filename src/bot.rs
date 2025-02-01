@@ -63,21 +63,17 @@ impl BotBuilder {
             next_state: State::Login,
         };
 
-        stream
-            .write_all(&to_raw(packet.serialize_packet(0)?))
-            .await?;
+        stream.write_all(&packet.serialize_raw(0)?).await?;
 
         Ok(())
     }
 
     async fn login(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
         let packet = packets::login::client::LoginStart {
-            username: self.username.clone(),
+            username: self.username.to_string(),
         };
 
-        stream
-            .write_all(&to_raw(packet.serialize_packet(0)?))
-            .await?;
+        stream.write_all(&packet.serialize_raw(0)?).await?;
 
         Ok(())
     }
@@ -148,7 +144,7 @@ impl Bot {
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
-        let packet = ClientSettings::default().serialize_raw(256)?;
+        let packet = ClientSettings::default().serialize_raw(self.cmp())?;
         self.tcp.stream.write_all(&packet).await?;
         Ok(())
     }
@@ -186,8 +182,4 @@ impl Bot {
 
         Ok(())
     }
-}
-
-fn to_raw(packet: (Vec<u8>, Vec<u8>)) -> Vec<u8> {
-    packet.0.into_iter().chain(packet.1).collect()
 }
