@@ -8,12 +8,14 @@ use kagami::minecraft::{packets, Packet, Packets};
 use kagami::tcp::State;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+use crate::events::{Context, Event, Events};
 use crate::stream::Stream;
 
 pub struct BotBuilder {
     username: String,
     host: String,
     port: u16,
+    events: Events,
 }
 
 impl BotBuilder {
@@ -36,6 +38,10 @@ impl BotBuilder {
         self
     }
 
+    pub fn on_chat(&mut self, callback: Event<play::server::Chat>) {
+        self.events.chat.push(callback);
+    }
+
     pub async fn run(self) -> anyhow::Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let mut stream = TcpStream::connect(addr).await?;
@@ -46,6 +52,7 @@ impl BotBuilder {
         let mut bot = Bot {
             username: self.username,
             tcp: Stream::new(stream),
+            events: self.events,
         };
 
         if let Err(e) = bot.run().await {
@@ -85,6 +92,7 @@ impl Default for BotBuilder {
             username: "minecraft_bot_1".to_string(),
             host: "127.0.0.1".to_string(),
             port: 25565,
+            events: Events::default(),
         }
     }
 }
@@ -92,6 +100,7 @@ impl Default for BotBuilder {
 pub struct Bot {
     username: String,
     tcp: Stream,
+    events: Events,
 }
 
 impl Bot {
@@ -178,7 +187,12 @@ impl Bot {
     }
 
     async fn run_on_chat_events(&mut self, ctx: play::server::Chat) -> anyhow::Result<()> {
-        println!("Chat: {}", ctx.message);
+        let context = Context {
+            bot: self,
+            data: &ctx,
+        };
+
+        self.events.chat.iter().for_each(|event| event(&context));
 
         Ok(())
     }
