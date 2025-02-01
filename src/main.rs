@@ -5,8 +5,8 @@ mod stream;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let bot = BotBuilder::new().with_username("Oery");
-    bot.connect().await?;
+    let mut bot = BotBuilder::new().with_username("AmeSombre");
+    bot.run().await?;
 
     Ok(())
 }

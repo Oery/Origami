@@ -36,7 +36,7 @@ impl BotBuilder {
         self
     }
 
-    pub async fn connect(self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let mut stream = TcpStream::connect(addr).await?;
 
