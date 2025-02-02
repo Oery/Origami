@@ -1,6 +1,13 @@
 [package]
 name = "origami"
 version = "0.1.0"
+authors = ["Oery"]
+description = "A programmable Minecraft client to build agents/bots."
+repository = "https://github.com/Oery/origami"
+readme = "README.md"
+license = "MIT"
+keywords = ["minecraft", "client", "networking", "bot", "ai"]
+categories = ["network-programming", "game-development", "simulation"]
 edition = "2021"
 
 [dependencies]
