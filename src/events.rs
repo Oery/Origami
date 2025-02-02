@@ -1,4 +1,4 @@
-use kagami::minecraft::packets::play;
+use gami_mc_protocol::packets::play;
 
 use crate::bot::Bot;
 

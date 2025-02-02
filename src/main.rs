@@ -1,6 +1,7 @@
+use gami_mc_protocol::packets::play;
+
 use bot::BotBuilder;
 use events::Context;
-use kagami::minecraft::packets::play;
 
 mod bot;
 mod events;

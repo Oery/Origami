@@ -2,21 +2,20 @@ use std::io::Read;
 
 use anyhow::Result;
 use bytes::{Buf, BufMut, BytesMut};
-use kagami::minecraft::packets::login::server::{LoginSuccess, SetCompression};
-use kagami::minecraft::packets::play::server::KeepAlive;
-use kagami::minecraft::Packet;
-use kagami::serialization::VarIntReader;
-use kagami::tcp::Origin;
-use kagami::{minecraft::Packets, tcp::State};
+use gami_mc_protocol::packets::login::server::{LoginSuccess, SetCompression};
+use gami_mc_protocol::packets::play::server::KeepAlive;
+use gami_mc_protocol::packets::{Packet, Packets};
+use gami_mc_protocol::registry::tcp::{Origins, States};
+use gami_mc_protocol::serialization::VarIntReader;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-const ORIGIN: Origin = Origin::Server;
+const ORIGIN: Origins = Origins::Server;
 
 pub struct Stream {
     pub stream: TcpStream,
     pub compression_threshold: i32,
-    pub state: State,
+    pub state: States,
     buffer: Vec<u8>,
     acc_buffer: BytesMut,
 }
@@ -26,7 +25,7 @@ impl Stream {
         Self {
             stream,
             compression_threshold: 0,
-            state: State::Login,
+            state: States::Login,
             buffer: vec![0; 500_000],
             acc_buffer: BytesMut::new(),
         }
@@ -76,7 +75,12 @@ impl Stream {
             return Ok(Some(packet));
         }
 
-        if let Ok(packet) = Packets::deserialize(packet_id, &bytes, &self.state, &ORIGIN) {
+        // match Packets::deserialize(packet_id, &bytes, &self.state, &ORIGIN) {
+        //     Ok(packet) => return Ok(Some(packet)),
+        //     Err(e) => eprintln!("Error deserializing packet: {:?}", e),
+        // }
+
+        if let Ok(packet) = Packets::deserialize(packet_id, &self.state, &ORIGIN, &bytes) {
             return Ok(Some(packet));
         }
 
@@ -85,23 +89,23 @@ impl Stream {
 
     async fn handle_events(&mut self, packet_id: i32, bytes: &[u8]) -> Result<Option<Packets>> {
         // Handle Set Compression
-        if packet_id == 0x03 && self.state == State::Login {
-            let packet = SetCompression::deserialize_packet(bytes)?;
+        if packet_id == 0x03 && self.state == States::Login {
+            let packet = SetCompression::deserialize(bytes)?;
             self.compression_threshold = packet.threshold;
             return Ok(Some(Packets::SetCompression(packet)));
         }
 
         // Handle Login Success
-        if packet_id == 0x02 && self.state == State::Login {
-            self.state = State::Play;
-            let packet = LoginSuccess::deserialize_packet(bytes)?;
+        if packet_id == 0x02 && self.state == States::Login {
+            self.state = States::Play;
+            let packet = LoginSuccess::deserialize(bytes)?;
             return Ok(Some(Packets::LoginSuccess(packet)));
         }
 
         // Handle Keep Alive
-        if packet_id == 0x00 && self.state == State::Play {
-            let packet = KeepAlive::deserialize_packet(bytes)?;
-            let bytes = packet.serialize_raw(self.compression_threshold)?;
+        if packet_id == 0x00 && self.state == States::Play {
+            let packet = KeepAlive::deserialize(bytes)?;
+            let bytes = packet.serialize(self.compression_threshold)?;
             self.stream.write_all(&bytes).await?;
             return Ok(Some(Packets::ServerKeepAlive(packet)));
         }

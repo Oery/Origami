@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use kagami::minecraft::packets::login::server::LoginSuccess;
-use kagami::minecraft::packets::play;
-use kagami::minecraft::packets::play::client::{Chat, ClientCommand, ClientSettings};
-use kagami::minecraft::packets::play::server::UpdateHealth;
-use kagami::minecraft::{packets, Packet, Packets};
-use kagami::tcp::State;
+use gami_mc_protocol::packets::login::server::LoginSuccess;
+use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings};
+use gami_mc_protocol::packets::play::server::UpdateHealth;
+use gami_mc_protocol::packets::{self, play};
+use gami_mc_protocol::packets::{Packet, Packets};
+use gami_mc_protocol::registry::tcp::States;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::events::{Context, Event, Events};
@@ -55,6 +55,14 @@ impl BotBuilder {
             events: self.events,
         };
 
+        // loop {
+        //     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        //     bot.tcp.read_packets().await?;
+        // }
+
+        // FIXME: Bot should always be in Play state, which means we must wait for the LoginSuccess packet
+        // We should also wait for the entity to be loaded, inventory to be loadeed, etc.
+
         if let Err(e) = bot.run().await {
             eprintln!("Bot Error: {:?}", e);
         }
@@ -67,10 +75,10 @@ impl BotBuilder {
             protocol_version: 47,
             server_host: self.host.clone(),
             server_port: self.port,
-            next_state: State::Login,
+            next_state: States::Login,
         };
 
-        stream.write_all(&packet.serialize_raw(0)?).await?;
+        stream.write_all(&packet.serialize(0)?).await?;
 
         Ok(())
     }
@@ -80,7 +88,7 @@ impl BotBuilder {
             username: self.username.to_string(),
         };
 
-        stream.write_all(&packet.serialize_raw(0)?).await?;
+        stream.write_all(&packet.serialize(0)?).await?;
 
         Ok(())
     }
@@ -136,26 +144,31 @@ impl Bot {
         // 7. User Events
         // 8. Tick Client
         // - Update Position
+        // Tick Physics
 
         Ok(())
     }
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        let packet = ClientCommand::respawn().serialize_raw(self.cmp())?;
+        let packet = ClientCommand::respawn().serialize(self.cmp())?;
         self.tcp.stream.write_all(&packet).await?;
         Ok(())
     }
 
     pub async fn chat(&mut self, message: &str) -> anyhow::Result<()> {
-        let packet = Chat::new(message).serialize_raw(self.cmp())?;
+        let packet = Chat::new(message).serialize(self.cmp())?;
         self.tcp.stream.write_all(&packet).await?;
         Ok(())
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
-        let packet = ClientSettings::default().serialize_raw(self.cmp())?;
+        let packet = ClientSettings::default().serialize(self.cmp())?;
         self.tcp.stream.write_all(&packet).await?;
         Ok(())
+    }
+
+    pub fn username(&self) -> &str {
+        &self.username
     }
 
     fn cmp(&self) -> i32 {
@@ -165,7 +178,7 @@ impl Bot {
     // EVENTS HANDLERS
     async fn run_on_connect_events(&mut self, ctx: LoginSuccess) -> anyhow::Result<()> {
         // FIXME: Packet is invalid if sent 1ms too early
-        tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         self.send_settings().await?;
         Ok(())
     }
