@@ -78,7 +78,7 @@ impl BotBuilder {
             next_state: States::Login,
         };
 
-        stream.write_all(&packet.serialize(0)?).await?;
+        stream.write_all(&packet.serialize(-1)?).await?;
 
         Ok(())
     }
@@ -88,7 +88,7 @@ impl BotBuilder {
             username: self.username.to_string(),
         };
 
-        stream.write_all(&packet.serialize(0)?).await?;
+        stream.write_all(&packet.serialize(-1)?).await?;
 
         Ok(())
     }

@@ -24,7 +24,7 @@ impl Stream {
     pub fn new(stream: TcpStream) -> Self {
         Self {
             stream,
-            compression_threshold: 0,
+            compression_threshold: -1,
             state: States::Login,
             buffer: vec![0; 500_000],
             acc_buffer: BytesMut::new(),
