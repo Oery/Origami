@@ -1,5 +1,6 @@
 use events::Context;
-use packets::play::server::{Chat, Login};
+use origami::packets::play;
+use packets::play::server::Chat;
 
 mod bot;
 mod events;
@@ -16,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
         println!("Chat from User Event: {}", ctx.payload.message);
     });
 
-    bot.on_packet(|ctx: &Context<Login>| {
+    bot.on_packet(|ctx: &Context<play::server::KickDisconnect>| {
         dbg!(ctx.payload);
     });
 
