@@ -13,5 +13,5 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.43.0", features = ["full"] }
 anyhow = "1.0.95"
-bytes = "1.9.0"
+bytes = "1.10.0"
 gami_mc_protocol = { version = "0.1.1", path = "../gami_mc_protocol" }
