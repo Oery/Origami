@@ -3,19 +3,19 @@ use std::time::Duration;
 use gami_mc_protocol::packets::login::server::LoginSuccess;
 use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings};
 use gami_mc_protocol::packets::play::server::UpdateHealth;
-use gami_mc_protocol::packets::{self, play};
+use gami_mc_protocol::packets::{self, play, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-use crate::events::{Context, Event, Events};
+use crate::events::{Dispatchable, EventHandlers, PacketHandler};
 use crate::stream::Stream;
 
 pub struct BotBuilder {
     username: String,
     host: String,
     port: u16,
-    events: Events,
+    events: EventHandlers,
 }
 
 impl BotBuilder {
@@ -36,10 +36,6 @@ impl BotBuilder {
     pub fn with_port(mut self, port: u16) -> Self {
         self.port = port;
         self
-    }
-
-    pub fn on_chat(&mut self, callback: Event<play::server::Chat>) {
-        self.events.chat.push(callback);
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
@@ -92,6 +88,14 @@ impl BotBuilder {
 
         Ok(())
     }
+
+    pub fn on_packet<T: ServerPacket>(&mut self, f: impl PacketHandler<T>) {
+        f.register(&mut self.events);
+    }
+
+    pub fn on_chat(&mut self, f: impl PacketHandler<play::server::Chat>) {
+        f.register(&mut self.events);
+    }
 }
 
 impl Default for BotBuilder {
@@ -100,7 +104,7 @@ impl Default for BotBuilder {
             username: "minecraft_bot_1".to_string(),
             host: "127.0.0.1".to_string(),
             port: 25565,
-            events: Events::default(),
+            events: EventHandlers::default(),
         }
     }
 }
@@ -108,7 +112,7 @@ impl Default for BotBuilder {
 pub struct Bot {
     username: String,
     tcp: Stream,
-    events: Events,
+    pub events: EventHandlers,
 }
 
 impl Bot {
@@ -125,23 +129,20 @@ impl Bot {
         let packets = self.tcp.read_packets().await?;
 
         for packet in packets {
+            Dispatchable::dispatch_packet_event(&packet, self);
+
             match packet {
-                Packets::LoginSuccess(ctx) => {
-                    self.run_on_connect_events(ctx).await?;
+                Packets::LoginSuccess(data) => {
+                    self.run_on_connect_events(&data).await?;
                 }
 
-                Packets::UpdateHealth(ctx) => {
-                    self.run_on_health_update_events(ctx).await?;
-                }
-
-                Packets::ServerChat(ctx) => {
-                    self.run_on_chat_events(ctx).await?;
+                Packets::UpdateHealth(data) => {
+                    self.run_on_health_update_events(&data).await?;
                 }
 
                 _ => {}
             }
         }
-        // 7. User Events
         // 8. Tick Client
         // - Update Position
         // Tick Physics
@@ -176,7 +177,7 @@ impl Bot {
     }
 
     // EVENTS HANDLERS
-    async fn run_on_connect_events(&mut self, ctx: LoginSuccess) -> anyhow::Result<()> {
+    async fn run_on_connect_events(&mut self, data: &LoginSuccess) -> anyhow::Result<()> {
         // FIXME: Packet is invalid if sent 1ms too early
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         self.send_settings().await?;
@@ -184,28 +185,16 @@ impl Bot {
     }
 
     async fn run_on_death_events(&mut self) -> anyhow::Result<()> {
+        // TODO: Add AutoRespawn flag
         self.respawn().await?;
+
         Ok(())
     }
 
-    async fn run_on_health_update_events(&mut self, ctx: UpdateHealth) -> anyhow::Result<()> {
-        println!("Health: {}", ctx.health);
-
-        if ctx.health <= 0.0 {
-            println!("Health is 0, bot has died");
+    async fn run_on_health_update_events(&mut self, data: &UpdateHealth) -> anyhow::Result<()> {
+        if data.health <= 0.0 {
             self.run_on_death_events().await?;
         }
-
-        Ok(())
-    }
-
-    async fn run_on_chat_events(&mut self, ctx: play::server::Chat) -> anyhow::Result<()> {
-        let context = Context {
-            bot: self,
-            data: &ctx,
-        };
-
-        self.events.chat.iter().for_each(|event| event(&context));
 
         Ok(())
     }
