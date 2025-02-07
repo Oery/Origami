@@ -39,6 +39,7 @@ pub struct EventHandlers {
     remove_entity_effect_handlers: Vec<EventHandler<play::server::RemoveEntityEffect>>,
     block_change_handlers: Vec<EventHandler<play::server::BlockChange>>,
     kick_disconnect_handlers: Vec<EventHandler<play::server::KickDisconnect>>,
+    server_difficulty_handlers: Vec<EventHandler<play::server::ServerDifficulty>>,
 }
 
 impl EventHandlers {
@@ -318,6 +319,15 @@ where
     }
 }
 
+impl<F> PacketHandler<play::server::ServerDifficulty> for F
+where
+    F: Fn(&Context<play::server::ServerDifficulty>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.server_difficulty_handlers.push(Box::new(self));
+    }
+}
+
 pub trait Dispatchable {
     fn dispatch_packet_event(&self, bot: &Bot);
 }
@@ -354,6 +364,7 @@ impl Dispatchable for Packets {
             Self::RemoveEntityEffect(payload) => bot.events.dispatch(payload, bot),
             Self::BlockChange(payload) => bot.events.dispatch(payload, bot),
             Self::KickDisconnect(payload) => bot.events.dispatch(payload, bot),
+            Self::ServerDifficulty(payload) => bot.events.dispatch(payload, bot),
             _ => {}
         };
     }
@@ -586,6 +597,14 @@ impl Dispatchable for Context<'_, '_, play::server::BlockChange> {
 impl Dispatchable for Context<'_, '_, play::server::KickDisconnect> {
     fn dispatch_packet_event(&self, bot: &Bot) {
         for event in &bot.events.kick_disconnect_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::ServerDifficulty> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.server_difficulty_handlers {
             event(self);
         }
     }
