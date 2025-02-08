@@ -8,7 +8,7 @@ use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-use crate::events::{Dispatchable, EventHandlers, PacketHandler};
+use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
 use crate::stream::Stream;
 
 pub struct BotBuilder {
@@ -143,6 +143,9 @@ impl Bot {
                 _ => {}
             }
         }
+
+        self.run_on_tick_events().await?;
+
         // 8. Tick Client
         // - Update Position
         // Tick Physics
@@ -181,6 +184,17 @@ impl Bot {
         // FIXME: Packet is invalid if sent 1ms too early
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         self.send_settings().await?;
+        Ok(())
+    }
+
+    async fn run_on_tick_events(&mut self) -> anyhow::Result<()> {
+        self.events.tick_handlers.iter().for_each(|e| {
+            e(&Context {
+                bot: self,
+                payload: &(),
+            })
+        });
+
         Ok(())
     }
 
