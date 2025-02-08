@@ -89,6 +89,10 @@ impl BotBuilder {
         Ok(())
     }
 
+    pub fn on_tick<T: Fn(&Context<'_, '_, ()>) + 'static>(&mut self, f: T) {
+        self.events.tick_handlers.push(Box::new(f))
+    }
+
     pub fn on_packet<T: ServerPacket>(&mut self, f: impl PacketHandler<T>) {
         f.register(&mut self.events);
     }
