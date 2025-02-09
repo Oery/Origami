@@ -10,6 +10,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
 use crate::stream::Stream;
+use crate::World;
 
 pub struct BotBuilder {
     username: String,
@@ -49,6 +50,7 @@ impl BotBuilder {
             username: self.username,
             tcp: Stream::new(stream),
             events: self.events,
+            world: World::default(),
         };
 
         // loop {
@@ -117,6 +119,7 @@ pub struct Bot {
     username: String,
     tcp: Stream,
     pub events: EventHandlers,
+    world: World,
 }
 
 impl Bot {
