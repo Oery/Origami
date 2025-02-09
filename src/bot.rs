@@ -8,6 +8,7 @@ use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+use crate::entity::Coordinates;
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
 use crate::stream::Stream;
 use crate::World;
@@ -145,6 +146,43 @@ impl Bot {
 
                 Packets::UpdateHealth(data) => {
                     self.run_on_health_update_events(&data).await?;
+                }
+
+                Packets::Entity(data) => {
+                    self.world.spawn_entity(data.entity_id);
+                }
+                Packets::EntityVelocity(data) => {
+                    self.world.spawn_entity(data.entity_id);
+                }
+                Packets::EntityMoveLook(data) => {
+                    self.world.spawn_entity(data.entity_id);
+                }
+
+                Packets::EntityRelativeMove(data) => {
+                    let entity = self.world.get_entity(data.entity_id)?;
+                    if let Some(ref mut coords) = entity.coords {
+                        coords.x += data.d_x as i32;
+                        coords.y += data.d_y as i32;
+                        coords.z += data.d_z as i32;
+                    }
+                }
+
+                Packets::EntityHeadRotation(data) => {
+                    let entity = self.world.get_entity(data.entity_id)?;
+                    if let Some(ref mut coords) = entity.coords {
+                        coords.yaw = data.head_yaw;
+                    }
+                }
+
+                Packets::EntityTeleport(data) => {
+                    let entity = self.world.get_entity(data.entity_id)?;
+                    entity.coords = Some(Coordinates {
+                        x: data.x,
+                        y: data.y,
+                        z: data.z,
+                        yaw: data.yaw,
+                        pitch: data.pitch,
+                    });
                 }
 
                 _ => {}
