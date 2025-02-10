@@ -6,6 +6,7 @@ use gami_mc_protocol::packets::play::server::UpdateHealth;
 use gami_mc_protocol::packets::{self, play, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
+use tokio::sync::mpsc;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::entity::Coordinates;
@@ -47,12 +48,17 @@ impl BotBuilder {
         self.set_protocol(&mut stream).await?;
         self.login(&mut stream).await?;
 
+        let (reader, writer) = stream.into_split();
+        let (tx, rx) = mpsc::channel::<Vec<u8>>(100);
+
         let mut bot = Bot {
             username: self.username,
-            tcp: Stream::new(stream),
+            tcp: Stream::new(reader, tx),
             events: self.events,
             world: World::default(),
         };
+
+        bot.tcp.listen(writer, rx);
 
         // loop {
         //     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -200,19 +206,26 @@ impl Bot {
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
         let packet = ClientCommand::respawn().serialize(self.cmp())?;
-        self.tcp.stream.write_all(&packet).await?;
+        self.tcp.tx.send(packet).await?;
         Ok(())
     }
 
-    pub async fn chat(&mut self, message: &str) -> anyhow::Result<()> {
-        let packet = Chat::new(message).serialize(self.cmp())?;
-        self.tcp.stream.write_all(&packet).await?;
-        Ok(())
+    pub fn chat(&self, message: &str) {
+        let Ok(packet) = Chat::new(message).serialize(self.cmp()) else {
+            eprintln!("[ERROR] bot.chat() : Failed to serialize chat packet");
+            return;
+        };
+
+        // TODO: Improve this
+        let tx = self.tcp.tx.clone();
+        tokio::spawn(async move {
+            tx.send(packet).await.unwrap();
+        });
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
         let packet = ClientSettings::default().serialize(self.cmp())?;
-        self.tcp.stream.write_all(&packet).await?;
+        self.tcp.tx.send(packet).await?;
         Ok(())
     }
 

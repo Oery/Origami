@@ -8,12 +8,14 @@ use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::{Origins, States};
 use gami_mc_protocol::serialization::VarIntReader;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::sync::mpsc;
 
 const ORIGIN: Origins = Origins::Server;
 
 pub struct Stream {
-    pub stream: TcpStream,
+    pub reader: OwnedReadHalf,
+    pub tx: mpsc::Sender<Vec<u8>>,
     pub compression_threshold: i32,
     pub state: States,
     buffer: Vec<u8>,
@@ -21,9 +23,10 @@ pub struct Stream {
 }
 
 impl Stream {
-    pub fn new(stream: TcpStream) -> Self {
+    pub fn new(reader: OwnedReadHalf, tx: mpsc::Sender<Vec<u8>>) -> Self {
         Self {
-            stream,
+            reader,
+            tx,
             compression_threshold: -1,
             state: States::Login,
             buffer: vec![0; 500_000],
@@ -31,11 +34,19 @@ impl Stream {
         }
     }
 
+    pub fn listen(&mut self, mut writer: OwnedWriteHalf, mut rx: mpsc::Receiver<Vec<u8>>) {
+        tokio::spawn(async move {
+            while let Some(i) = rx.recv().await {
+                writer.write_all(&i).await.unwrap();
+            }
+        });
+    }
+
     pub async fn read_packets(&mut self) -> Result<Vec<Packets>> {
         let buf = &mut self.buffer;
         let mut packets = Vec::new();
 
-        let bytes_read = self.stream.read(buf).await?;
+        let bytes_read = self.reader.read(buf).await?;
         self.acc_buffer.put_slice(&buf[..bytes_read]);
 
         loop {
@@ -106,7 +117,7 @@ impl Stream {
         if packet_id == 0x00 && self.state == States::Play {
             let packet = KeepAlive::deserialize(bytes)?;
             let bytes = packet.serialize(self.compression_threshold)?;
-            self.stream.write_all(&bytes).await?;
+            self.tx.send(bytes).await?;
             return Ok(Some(Packets::ServerKeepAlive(packet)));
         }
 
