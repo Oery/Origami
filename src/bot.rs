@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use gami_mc_protocol::packets::login::server::LoginSuccess;
-use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings};
+use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings, UseEntity};
 use gami_mc_protocol::packets::play::server::UpdateHealth;
 use gami_mc_protocol::packets::{self, play, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
@@ -236,6 +236,26 @@ impl Bot {
     pub fn chat(&self, message: &str) {
         let Ok(packet) = Chat::new(message).serialize(self.cmp()) else {
             eprintln!("[ERROR] bot.chat() : Failed to serialize chat packet");
+            return;
+        };
+
+        // TODO: Improve this
+        let tx = self.tcp.tx.clone();
+        tokio::spawn(async move {
+            tx.send(packet).await.unwrap();
+        });
+    }
+
+    /// FIXME: Bot get disconnected when attacking an 'invalid entity'
+    /// This is caused by non attackable entities (items, exp, etc)
+    pub fn attack_entity(&self, id: i32) {
+        if id == self.entity_id {
+            eprintln!("[WARN] bot.attack_entity() : Cannot attack own entity, canceling...");
+            return;
+        }
+
+        let Ok(packet) = UseEntity::attack(id).serialize(self.cmp()) else {
+            eprintln!("[ERROR] bot.attack_entity() : Failed to serialize packet");
             return;
         };
 
