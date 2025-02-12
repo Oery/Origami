@@ -11,6 +11,7 @@ pub type EventHandler<T> = Box<dyn Fn(&Context<T>)>;
 #[derive(Default)]
 pub struct EventHandlers {
     pub tick_handlers: Vec<EventHandler<()>>,
+    pub on_connect_handlers: Vec<EventHandler<()>>,
     keep_alive_handlers: Vec<EventHandler<play::server::KeepAlive>>,
     join_game_handlers: Vec<EventHandler<play::server::JoinGame>>,
     chat_handlers: Vec<EventHandler<play::server::Chat>>,

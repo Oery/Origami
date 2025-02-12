@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use gami_mc_protocol::packets::login::server::LoginSuccess;
 use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings, UseEntity};
 use gami_mc_protocol::packets::play::server::UpdateHealth;
 use gami_mc_protocol::packets::{self, play, ServerPacket};
@@ -123,6 +122,10 @@ impl BotBuilder {
         f.register(&mut self.events);
     }
 
+    pub fn on_connect<T: Fn(&Context<'_, '_, ()>) + 'static>(&mut self, f: T) {
+        self.events.on_connect_handlers.push(Box::new(f))
+    }
+
     pub fn on_chat(&mut self, f: impl PacketHandler<play::server::Chat>) {
         f.register(&mut self.events);
     }
@@ -175,8 +178,8 @@ impl Bot {
             Dispatchable::dispatch_packet_event(&packet, self);
 
             match packet {
-                Packets::LoginSuccess(data) => {
-                    self.run_on_connect_events(&data).await?;
+                Packets::LoginSuccess(_) => {
+                    self.run_on_connect_events().await?;
                 }
 
                 Packets::UpdateHealth(data) => {
@@ -293,9 +296,15 @@ impl Bot {
     }
 
     // EVENTS HANDLERS
-    async fn run_on_connect_events(&mut self, data: &LoginSuccess) -> anyhow::Result<()> {
+    async fn run_on_connect_events(&mut self) -> anyhow::Result<()> {
         self.send_settings().await?;
-        // TODO: Add User Event
+
+        self.events.on_connect_handlers.iter().for_each(|e| {
+            e(&Context {
+                bot: self,
+                payload: &(),
+            })
+        });
 
         Ok(())
     }
