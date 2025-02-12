@@ -12,7 +12,7 @@ pub type EventHandler<T> = Box<dyn Fn(&Context<T>)>;
 pub struct EventHandlers {
     pub tick_handlers: Vec<EventHandler<()>>,
     keep_alive_handlers: Vec<EventHandler<play::server::KeepAlive>>,
-    login_handlers: Vec<EventHandler<play::server::Login>>,
+    join_game_handlers: Vec<EventHandler<play::server::JoinGame>>,
     chat_handlers: Vec<EventHandler<play::server::Chat>>,
     update_time_handlers: Vec<EventHandler<play::server::UpdateTime>>,
     spawn_position_handlers: Vec<EventHandler<play::server::SpawnPosition>>,
@@ -66,12 +66,12 @@ where
     }
 }
 
-impl<F> PacketHandler<play::server::Login> for F
+impl<F> PacketHandler<play::server::JoinGame> for F
 where
-    F: Fn(&Context<play::server::Login>) + 'static,
+    F: Fn(&Context<play::server::JoinGame>) + 'static,
 {
     fn register(self, events: &mut EventHandlers) {
-        events.login_handlers.push(Box::new(self));
+        events.join_game_handlers.push(Box::new(self));
     }
 }
 
@@ -338,7 +338,7 @@ impl Dispatchable for Packets {
         match self {
             Self::ServerKeepAlive(payload) => bot.events.dispatch(payload, bot),
             Self::ServerChat(payload) => bot.events.dispatch(payload, bot),
-            Self::Login(payload) => bot.events.dispatch(payload, bot),
+            Self::JoinGame(payload) => bot.events.dispatch(payload, bot),
             Self::UpdateTime(payload) => bot.events.dispatch(payload, bot),
             Self::SpawnPosition(payload) => bot.events.dispatch(payload, bot),
             Self::UpdateHealth(payload) => bot.events.dispatch(payload, bot),
@@ -387,9 +387,9 @@ impl Dispatchable for Context<'_, '_, play::server::Chat> {
     }
 }
 
-impl Dispatchable for Context<'_, '_, play::server::Login> {
+impl Dispatchable for Context<'_, '_, play::server::JoinGame> {
     fn dispatch_packet_event(&self, bot: &Bot) {
-        for event in &bot.events.login_handlers {
+        for event in &bot.events.join_game_handlers {
             event(self);
         }
     }
