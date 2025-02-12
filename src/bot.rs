@@ -51,22 +51,39 @@ impl BotBuilder {
         let (reader, writer) = stream.into_split();
         let (tx, rx) = mpsc::channel::<Vec<u8>>(100);
 
+        let mut stream = Stream::new(reader, tx);
+        let mut packets = vec![];
+        let mut uuid = String::new();
+        let mut entity_id = None;
+        let mut game_mode = None;
+
+        while entity_id.is_none() {
+            let mut new_packets = stream.read_packets().await?;
+
+            for packet in &new_packets {
+                if let Packets::LoginSuccess(data) = packet {
+                    uuid = data.uuid.clone();
+                } else if let Packets::JoinGame(data) = packet {
+                    entity_id = Some(data.entity_id);
+                    game_mode = Some(data.game_mode);
+                }
+            }
+
+            packets.append(&mut new_packets);
+        }
+
         let mut bot = Bot {
             username: self.username,
-            tcp: Stream::new(reader, tx),
+            tcp: stream,
             events: self.events,
             world: World::default(),
+            uuid,
+            entity_id: entity_id.unwrap(),
+            game_mode: game_mode.unwrap(),
         };
 
         bot.tcp.listen(writer, rx);
-
-        // loop {
-        //     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        //     bot.tcp.read_packets().await?;
-        // }
-
-        // FIXME: Bot should always be in Play state, which means we must wait for the LoginSuccess packet
-        // We should also wait for the entity to be loaded, inventory to be loadeed, etc.
+        bot.handle_packets(packets).await?;
 
         if let Err(e) = bot.run().await {
             eprintln!("Bot Error: {:?}", e);
@@ -126,7 +143,10 @@ pub struct Bot {
     username: String,
     tcp: Stream,
     pub events: EventHandlers,
-    world: World,
+    pub world: World,
+    uuid: String,
+    entity_id: i32,
+    game_mode: u8,
 }
 
 impl Bot {
@@ -139,9 +159,18 @@ impl Bot {
         }
     }
 
-    async fn tick(&mut self) -> anyhow::Result<()> {
+    pub(crate) async fn tick(&mut self) -> anyhow::Result<()> {
         let packets = self.tcp.read_packets().await?;
+        self.handle_packets(packets).await?;
 
+        self.run_on_tick_events().await?;
+
+        // TODO: Tick Physics / Update Position
+
+        Ok(())
+    }
+
+    pub(crate) async fn handle_packets(&mut self, packets: Vec<Packets>) -> anyhow::Result<()> {
         for packet in packets {
             Dispatchable::dispatch_packet_event(&packet, self);
 
@@ -195,12 +224,6 @@ impl Bot {
             }
         }
 
-        self.run_on_tick_events().await?;
-
-        // 8. Tick Client
-        // - Update Position
-        // Tick Physics
-
         Ok(())
     }
 
@@ -233,15 +256,27 @@ impl Bot {
         &self.username
     }
 
+    pub fn entity_id(&self) -> i32 {
+        self.entity_id
+    }
+
+    pub fn uuid(&self) -> &str {
+        &self.uuid
+    }
+
+    pub fn game_mode(&self) -> u8 {
+        self.game_mode
+    }
+
     fn cmp(&self) -> i32 {
         self.tcp.compression_threshold
     }
 
     // EVENTS HANDLERS
     async fn run_on_connect_events(&mut self, data: &LoginSuccess) -> anyhow::Result<()> {
-        // FIXME: Packet is invalid if sent 1ms too early
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         self.send_settings().await?;
+        // TODO: Add User Event
+
         Ok(())
     }
 
