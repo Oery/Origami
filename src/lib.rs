@@ -1,5 +1,4 @@
 mod bot;
-mod entity;
 mod events;
 mod stream;
 mod world;
