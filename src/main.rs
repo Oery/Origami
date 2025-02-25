@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
 
     bot.on_chat(|ctx: &Context<Chat>| {
         if ctx.payload.message.contains("attack") {
-            for entity in ctx.bot.world().entities.iter() {
+            for entity in ctx.bot.world().entities.values() {
                 ctx.bot.attack_entity(entity.as_entity().id());
             }
         }
@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         if ctx.payload.message.contains("sheep") {
-            for entity in ctx.bot.world().entities.iter() {
+            for entity in ctx.bot.world().entities.values() {
                 if let EntityKind::Sheep(sheep) = entity {
                     ctx.bot.chat(&format!("Sheep Color: {}", sheep.color));
                 }
@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         if ctx.payload.message.contains("pig") {
-            let pigs = ctx.bot.world().entities.iter().filter_map(|e| {
+            let pigs = ctx.bot.world().entities.values().filter_map(|e| {
                 if let EntityKind::Pig(pig) = e {
                     Some(pig)
                 } else {
@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     bot.on_tick(|ctx: &Context<()>| {
-        for entity in ctx.bot.world().entities.iter() {
+        for entity in ctx.bot.world().entities.values() {
             if let EntityKind::Pig(pig) = entity {
                 if pig.has_saddle {
                     ctx.bot.attack_entity(entity.id());

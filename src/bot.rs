@@ -223,16 +223,16 @@ impl Bot {
                 // }
                 Packets::SpawnObject(object) => {
                     let entity = EntityKind::from(&object);
-                    self.world.entities.push(entity);
+                    self.world.entities.insert(entity.id(), entity);
                 }
 
                 Packets::SpawnMob(mob) => {
                     let entity = EntityKind::from(&mob);
-                    self.world.entities.push(entity);
+                    self.world.entities.insert(entity.id(), entity);
                 }
 
                 Packets::EntityMetadata(data) => {
-                    if let Some(entity) = self.world.get_entity_mut(data.entity_id) {
+                    if let Some(entity) = self.world.entities.get_mut(&data.entity_id) {
                         entity.update(&data.metadatas);
                     }
                 }
