@@ -86,13 +86,13 @@ impl Stream {
             return Ok(Some(packet));
         }
 
-        // match Packets::deserialize(packet_id, &bytes, &self.state, &ORIGIN) {
-        //     Ok(packet) => return Ok(Some(packet)),
-        //     Err(e) => eprintln!("Error deserializing packet: {:?}", e),
-        // }
-
-        if let Ok(packet) = Packets::deserialize(packet_id, &self.state, &ORIGIN, &bytes) {
-            return Ok(Some(packet));
+        match Packets::deserialize(packet_id, &self.state, &ORIGIN, &bytes) {
+            Ok(packet) => return Ok(Some(packet)),
+            Err(e) => {
+                if !e.to_string().contains("Unknown packet") {
+                    eprintln!("Error deserializing packet {packet_id}: {:?}", e);
+                }
+            }
         }
 
         Ok(None)
