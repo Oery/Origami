@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use gami_mc_protocol::packets::play::client::{Chat, ClientCommand, ClientSettings, UseEntity};
-use gami_mc_protocol::packets::play::server::UpdateHealth;
-use gami_mc_protocol::packets::{self, play, ServerPacket};
+use gami_mc_protocol::packets::{self, play::*, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use gami_mc_protocol::registry::EntityKind;
@@ -126,7 +124,7 @@ impl BotBuilder {
         self.events.on_connect_handlers.push(Box::new(f))
     }
 
-    pub fn on_chat(&mut self, f: impl PacketHandler<play::server::Chat>) {
+    pub fn on_chat(&mut self, f: impl PacketHandler<server::Chat>) {
         f.register(&mut self.events);
     }
 }
@@ -146,7 +144,7 @@ pub struct Bot {
     username: String,
     tcp: Stream,
     pub events: EventHandlers,
-    pub world: World,
+    world: World,
     uuid: String,
     entity_id: i32,
     game_mode: u8,
@@ -247,13 +245,13 @@ impl Bot {
     }
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        let packet = ClientCommand::respawn().serialize(self.cmp())?;
+        let packet = packets::play::client::ClientCommand::respawn().serialize(self.cmp())?;
         self.tcp.tx.send(packet).await?;
         Ok(())
     }
 
     pub fn chat(&self, message: &str) {
-        let Ok(packet) = Chat::new(message).serialize(self.cmp()) else {
+        let Ok(packet) = client::Chat::new(message).serialize(self.cmp()) else {
             eprintln!("[ERROR] bot.chat() : Failed to serialize chat packet");
             return;
         };
@@ -273,7 +271,7 @@ impl Bot {
             return;
         }
 
-        let Ok(packet) = UseEntity::attack(id).serialize(self.cmp()) else {
+        let Ok(packet) = client::UseEntity::attack(id).serialize(self.cmp()) else {
             eprintln!("[ERROR] bot.attack_entity() : Failed to serialize packet");
             return;
         };
@@ -286,7 +284,7 @@ impl Bot {
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
-        let packet = ClientSettings::default().serialize(self.cmp())?;
+        let packet = client::ClientSettings::default().serialize(self.cmp())?;
         self.tcp.tx.send(packet).await?;
         Ok(())
     }
@@ -305,6 +303,10 @@ impl Bot {
 
     pub fn game_mode(&self) -> u8 {
         self.game_mode
+    }
+
+    pub fn world(&self) -> &World {
+        &self.world
     }
 
     fn cmp(&self) -> i32 {
@@ -343,7 +345,10 @@ impl Bot {
         Ok(())
     }
 
-    async fn run_on_health_update_events(&mut self, data: &UpdateHealth) -> anyhow::Result<()> {
+    async fn run_on_health_update_events(
+        &mut self,
+        data: &server::UpdateHealth,
+    ) -> anyhow::Result<()> {
         if data.health <= 0.0 {
             self.run_on_death_events().await?;
         }
