@@ -51,9 +51,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     bot.on_tick(|ctx: &Context<()>| {
-        for entity in ctx.bot.world.entities.iter() {
-            ctx.bot.attack_entity(entity.id);
-        }
+        for entity in ctx.bot.world().entities.iter() {
             if let EntityKind::Pig(pig) = entity {
                 if pig.has_saddle {
                     ctx.bot.attack_entity(entity.id());
