@@ -296,17 +296,23 @@ impl Bot<'_> {
         });
     }
 
-    /// FIXME: Bot get disconnected when attacking an 'invalid entity'
-    /// This is caused by non attackable entities (items, exp, etc)
-    pub fn attack_entity(&self, id: i32) {
+    pub fn attack_entity(&self, id: i32) -> anyhow::Result<()> {
         if id == self.entity_id {
-            eprintln!("[WARN] bot.attack_entity() : Cannot attack own entity, canceling...");
-            return;
+            return Err(anyhow::anyhow!("Cannot attack self"));
         }
 
-        let Ok(packet) = client::UseEntity::attack(id).serialize(self.cmp()) else {
-            eprintln!("[ERROR] bot.attack_entity() : Failed to serialize packet");
-            return;
+        let Some(entity) = self.world.entities.get(&id) else {
+            return Err(anyhow::anyhow!("Entity not found"));
+        };
+
+        match entity {
+            EntityKind::ItemStack(_) => return Err(anyhow::anyhow!("Cannot attack entity")),
+            EntityKind::ExperienceOrb(_) => return Err(anyhow::anyhow!("Cannot attack entity")),
+            _ => {}
+        }
+
+        let Ok(packet) = client::UseEntity::attack(entity.id()).serialize(self.cmp()) else {
+            return Err(anyhow::anyhow!("Failed to serialize packet"));
         };
 
         // TODO: Improve this
@@ -314,6 +320,8 @@ impl Bot<'_> {
         tokio::spawn(async move {
             tx.send(packet).await.unwrap();
         });
+
+        Ok(())
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
