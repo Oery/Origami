@@ -2,7 +2,7 @@ use crate::packets::{play, Packets, ServerPacket};
 use crate::Bot;
 
 pub struct Context<'bot, 'payload, T> {
-    pub bot: &'bot Bot,
+    pub bot: &'bot Bot<'bot>,
     pub payload: &'payload T,
 }
 

@@ -5,6 +5,7 @@ use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use gami_mc_protocol::registry::EntityKind;
 use tokio::sync::mpsc;
+use tokio::time::sleep;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
@@ -16,6 +17,8 @@ pub struct BotBuilder {
     host: String,
     port: u16,
     events: EventHandlers,
+    autoreconnect: bool,
+    reconnect_delay: Duration,
 }
 
 impl BotBuilder {
@@ -38,55 +41,72 @@ impl BotBuilder {
         self
     }
 
+    pub fn with_autoreconnect(mut self, autoreconnect: bool) -> Self {
+        self.autoreconnect = autoreconnect;
+        self
+    }
+
+    pub fn with_reconnect_delay(mut self, delay: Duration) -> Self {
+        self.reconnect_delay = delay;
+        self
+    }
+
     pub async fn run(self) -> anyhow::Result<()> {
-        let addr = format!("{}:{}", self.host, self.port);
-        let mut stream = TcpStream::connect(addr).await?;
+        loop {
+            let addr = format!("{}:{}", self.host, self.port);
+            let mut stream = TcpStream::connect(addr).await?;
 
-        self.set_protocol(&mut stream).await?;
-        self.login(&mut stream).await?;
+            self.set_protocol(&mut stream).await?;
+            self.login(&mut stream).await?;
 
-        let (reader, writer) = stream.into_split();
-        let (tx, rx) = mpsc::channel::<Vec<u8>>(100);
+            let (reader, writer) = stream.into_split();
+            let (tx, rx) = mpsc::channel::<Vec<u8>>(100);
 
-        let mut stream = Stream::new(reader, tx);
-        let mut packets = vec![];
-        let mut uuid = String::new();
-        let mut entity_id = None;
-        let mut game_mode = None;
+            let mut stream = Stream::new(reader, tx);
+            let mut packets = vec![];
+            let mut uuid = String::new();
+            let mut entity_id = None;
+            let mut game_mode = None;
 
-        while entity_id.is_none() {
-            let mut new_packets = stream.read_packets().await?;
+            while entity_id.is_none() {
+                let mut new_packets = stream.read_packets().await?;
 
-            for packet in &new_packets {
-                if let Packets::LoginSuccess(data) = packet {
-                    uuid = data.uuid.clone();
-                } else if let Packets::JoinGame(data) = packet {
-                    entity_id = Some(data.entity_id);
-                    game_mode = Some(data.game_mode);
+                for packet in &new_packets {
+                    if let Packets::LoginSuccess(data) = packet {
+                        uuid = data.uuid.clone();
+                    } else if let Packets::JoinGame(data) = packet {
+                        entity_id = Some(data.entity_id);
+                        game_mode = Some(data.game_mode);
+                    }
+                }
+
+                packets.append(&mut new_packets);
+            }
+
+            let mut bot = Bot {
+                username: &self.username,
+                tcp: stream,
+                events: &self.events,
+                world: World::default(),
+                uuid,
+                entity_id: entity_id.unwrap(),
+                game_mode: game_mode.unwrap(),
+            };
+
+            bot.tcp.listen(writer, rx);
+            bot.handle_packets(packets).await?;
+
+            if let Err(e) = bot.run().await {
+                eprintln!("Bot Error: {:?}", e);
+
+                if self.autoreconnect {
+                    sleep(self.reconnect_delay).await;
+                    continue;
                 }
             }
 
-            packets.append(&mut new_packets);
+            return Ok(());
         }
-
-        let mut bot = Bot {
-            username: self.username,
-            tcp: stream,
-            events: self.events,
-            world: World::default(),
-            uuid,
-            entity_id: entity_id.unwrap(),
-            game_mode: game_mode.unwrap(),
-        };
-
-        bot.tcp.listen(writer, rx);
-        bot.handle_packets(packets).await?;
-
-        if let Err(e) = bot.run().await {
-            eprintln!("Bot Error: {:?}", e);
-        }
-
-        Ok(())
     }
 
     async fn set_protocol(&self, stream: &mut TcpStream) -> anyhow::Result<()> {
@@ -136,21 +156,23 @@ impl Default for BotBuilder {
             host: "127.0.0.1".to_string(),
             port: 25565,
             events: EventHandlers::default(),
+            autoreconnect: true,
+            reconnect_delay: Duration::from_secs(5),
         }
     }
 }
 
-pub struct Bot {
-    username: String,
+pub struct Bot<'a> {
+    username: &'a String,
     tcp: Stream,
-    pub events: EventHandlers,
+    pub events: &'a EventHandlers,
     world: World,
     uuid: String,
     entity_id: i32,
     game_mode: u8,
 }
 
-impl Bot {
+impl Bot<'_> {
     async fn run(&mut self) -> anyhow::Result<()> {
         let mut interval = tokio::time::interval(Duration::from_millis(50));
 
@@ -237,6 +259,13 @@ impl Bot {
                     }
                 }
 
+                Packets::KickDisconnect(data) => {
+                    return Err(anyhow::anyhow!(
+                        "Disconnected from server: {:?}",
+                        data.reason
+                    ));
+                }
+
                 _ => {}
             }
         }
@@ -290,7 +319,7 @@ impl Bot {
     }
 
     pub fn username(&self) -> &str {
-        &self.username
+        self.username
     }
 
     pub fn entity_id(&self) -> i32 {
