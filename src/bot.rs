@@ -296,23 +296,30 @@ impl Bot<'_> {
         });
     }
 
-    pub fn attack_entity(&self, id: i32) -> anyhow::Result<()> {
+    pub fn attack_entity(&self, id: i32) {
         if id == self.entity_id {
-            return Err(anyhow::anyhow!("Cannot attack self"));
+            eprintln!("[WARN] Cannot attack self, canceling...");
+            return;
         }
 
         let Some(entity) = self.world.entities.get(&id) else {
-            return Err(anyhow::anyhow!("Entity not found"));
+            eprintln!("[ERROR] Entity not found");
+            return;
         };
 
-        match entity {
-            EntityKind::ItemStack(_) => return Err(anyhow::anyhow!("Cannot attack entity")),
-            EntityKind::ExperienceOrb(_) => return Err(anyhow::anyhow!("Cannot attack entity")),
-            _ => {}
+        let is_attackable = !matches!(
+            entity,
+            EntityKind::ItemStack(_) | EntityKind::ExperienceOrb(_)
+        );
+
+        if !is_attackable {
+            eprintln!("[WARN] Cannot attack entity, canceling...");
+            return;
         }
 
         let Ok(packet) = client::UseEntity::attack(entity.id()).serialize(self.cmp()) else {
-            return Err(anyhow::anyhow!("Failed to serialize packet"));
+            eprintln!("[ERROR] Failed to serialize packet");
+            return;
         };
 
         // TODO: Improve this
@@ -320,8 +327,6 @@ impl Bot<'_> {
         tokio::spawn(async move {
             tx.send(packet).await.unwrap();
         });
-
-        Ok(())
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
