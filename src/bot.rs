@@ -144,6 +144,10 @@ impl BotBuilder {
         self.events.on_connect_handlers.push(Box::new(f))
     }
 
+    pub fn on_disconnect(&mut self, f: impl PacketHandler<server::KickDisconnect>) {
+        f.register(&mut self.events);
+    }
+
     pub fn on_chat(&mut self, f: impl PacketHandler<server::Chat>) {
         f.register(&mut self.events);
     }
