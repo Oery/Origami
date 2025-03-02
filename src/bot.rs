@@ -54,7 +54,15 @@ impl BotBuilder {
     pub async fn run(self) -> anyhow::Result<()> {
         loop {
             let addr = format!("{}:{}", self.host, self.port);
-            let mut stream = TcpStream::connect(addr).await?;
+
+            let mut stream = match TcpStream::connect(addr).await {
+                Ok(stream) => stream,
+                Err(_) if self.autoreconnect => {
+                    tokio::time::sleep(self.reconnect_delay).await;
+                    continue;
+                }
+                Err(err) => return Err(err.into()),
+            };
 
             self.set_protocol(&mut stream).await?;
             self.login(&mut stream).await?;
