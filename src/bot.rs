@@ -5,7 +5,7 @@ use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::States;
 use gami_mc_protocol::registry::EntityKind;
 use tokio::sync::mpsc;
-use tokio::time::sleep;
+use tokio::time;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
@@ -17,8 +17,7 @@ pub struct BotBuilder {
     host: String,
     port: u16,
     events: EventHandlers,
-    autoreconnect: bool,
-    reconnect_delay: Duration,
+    autoreconnect: Option<Duration>,
 }
 
 impl BotBuilder {
@@ -41,13 +40,8 @@ impl BotBuilder {
         self
     }
 
-    pub fn with_autoreconnect(mut self, autoreconnect: bool) -> Self {
-        self.autoreconnect = autoreconnect;
-        self
-    }
-
-    pub fn with_reconnect_delay(mut self, delay: Duration) -> Self {
-        self.reconnect_delay = delay;
+    pub fn with_autoreconnect(mut self, delay: Option<Duration>) -> Self {
+        self.autoreconnect = delay;
         self
     }
 
@@ -57,11 +51,13 @@ impl BotBuilder {
 
             let mut stream = match TcpStream::connect(addr).await {
                 Ok(stream) => stream,
-                Err(_) if self.autoreconnect => {
-                    tokio::time::sleep(self.reconnect_delay).await;
-                    continue;
+                Err(err) => {
+                    if let Some(delay) = self.autoreconnect {
+                        time::sleep(delay).await;
+                        continue;
+                    }
+                    return Err(err.into());
                 }
-                Err(err) => return Err(err.into()),
             };
 
             self.set_protocol(&mut stream).await?;
@@ -107,8 +103,8 @@ impl BotBuilder {
             if let Err(e) = bot.run().await {
                 eprintln!("Bot Error: {:?}", e);
 
-                if self.autoreconnect {
-                    sleep(self.reconnect_delay).await;
+                if let Some(delay) = self.autoreconnect {
+                    time::sleep(delay).await;
                     continue;
                 }
             }
@@ -168,8 +164,7 @@ impl Default for BotBuilder {
             host: "127.0.0.1".to_string(),
             port: 25565,
             events: EventHandlers::default(),
-            autoreconnect: true,
-            reconnect_delay: Duration::from_secs(5),
+            autoreconnect: Some(Duration::from_secs(5)),
         }
     }
 }
