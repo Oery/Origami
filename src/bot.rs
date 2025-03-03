@@ -46,7 +46,7 @@ impl BotBuilder {
     }
 
     pub async fn run(self) -> anyhow::Result<()> {
-        loop {
+        'run: loop {
             let addr = format!("{}:{}", self.host, self.port);
 
             let mut stream = match TcpStream::connect(addr).await {
@@ -76,11 +76,28 @@ impl BotBuilder {
                 let mut new_packets = stream.read_packets().await?;
 
                 for packet in &new_packets {
-                    if let Packets::LoginSuccess(data) = packet {
-                        uuid = data.uuid.clone();
-                    } else if let Packets::JoinGame(data) = packet {
-                        entity_id = Some(data.entity_id);
-                        game_mode = Some(data.game_mode);
+                    match packet {
+                        Packets::LoginSuccess(data) => {
+                            uuid = data.uuid.clone();
+                        }
+
+                        Packets::JoinGame(data) => {
+                            entity_id = Some(data.entity_id);
+                            game_mode = Some(data.game_mode);
+                        }
+
+                        Packets::Disconnect(data) => {
+                            if let Some(delay) = self.autoreconnect {
+                                time::sleep(delay).await;
+                                continue 'run;
+                            }
+
+                            return Err(anyhow::anyhow!(
+                                "Disconnected from server: {:?}",
+                                data.reason
+                            ));
+                        }
+                        _ => {}
                     }
                 }
 
