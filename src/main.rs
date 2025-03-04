@@ -4,6 +4,7 @@ use packets::play::server::Chat;
 
 mod bot;
 mod events;
+mod scores;
 mod stream;
 mod world;
 

@@ -43,6 +43,10 @@ pub struct EventHandlers {
     block_change_handlers: Vec<EventHandler<play::server::BlockChange>>,
     kick_disconnect_handlers: Vec<EventHandler<play::server::KickDisconnect>>,
     server_difficulty_handlers: Vec<EventHandler<play::server::ServerDifficulty>>,
+    scoreboard_objective_handlers: Vec<EventHandler<play::server::ScoreboardObjective>>,
+    scoreboard_update_handlers: Vec<EventHandler<play::server::ScoreboardUpdate>>,
+    scoreboard_display_handlers: Vec<EventHandler<play::server::ScoreboardDisplay>>,
+    teams_handlers: Vec<EventHandler<play::server::Teams>>,
 }
 
 impl EventHandlers {
@@ -340,6 +344,42 @@ where
     }
 }
 
+impl<F> PacketHandler<play::server::ScoreboardObjective> for F
+where
+    F: Fn(&Context<play::server::ScoreboardObjective>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.scoreboard_objective_handlers.push(Box::new(self));
+    }
+}
+
+impl<F> PacketHandler<play::server::ScoreboardUpdate> for F
+where
+    F: Fn(&Context<play::server::ScoreboardUpdate>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.scoreboard_update_handlers.push(Box::new(self));
+    }
+}
+
+impl<F> PacketHandler<play::server::ScoreboardDisplay> for F
+where
+    F: Fn(&Context<play::server::ScoreboardDisplay>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.scoreboard_display_handlers.push(Box::new(self));
+    }
+}
+
+impl<F> PacketHandler<play::server::Teams> for F
+where
+    F: Fn(&Context<play::server::Teams>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.teams_handlers.push(Box::new(self));
+    }
+}
+
 pub trait Dispatchable {
     fn dispatch_packet_event(&self, bot: &Bot);
 }
@@ -378,6 +418,10 @@ impl Dispatchable for Packets {
             Self::BlockChange(payload) => bot.events.dispatch(payload, bot),
             Self::KickDisconnect(payload) => bot.events.dispatch(payload, bot),
             Self::ServerDifficulty(payload) => bot.events.dispatch(payload, bot),
+            Self::ScoreboardObjective(payload) => bot.events.dispatch(payload, bot),
+            Self::ScoreboardUpdate(payload) => bot.events.dispatch(payload, bot),
+            Self::ScoreboardDisplay(payload) => bot.events.dispatch(payload, bot),
+            Self::Teams(payload) => bot.events.dispatch(payload, bot),
             _ => {}
         };
     }
@@ -626,6 +670,38 @@ impl Dispatchable for Context<'_, '_, play::server::KickDisconnect> {
 impl Dispatchable for Context<'_, '_, play::server::ServerDifficulty> {
     fn dispatch_packet_event(&self, bot: &Bot) {
         for event in &bot.events.server_difficulty_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::ScoreboardObjective> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.scoreboard_objective_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::ScoreboardUpdate> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.scoreboard_update_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::ScoreboardDisplay> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.scoreboard_display_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::Teams> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.teams_handlers {
             event(self);
         }
     }
