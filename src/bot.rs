@@ -204,13 +204,13 @@ impl Default for BotBuilder {
 }
 
 pub struct Bot<'a> {
-    username: &'a String,
+    pub username: &'a String,
     tcp: Stream,
     pub events: &'a EventHandlers,
-    world: World,
-    uuid: String,
-    entity_id: i32,
-    game_mode: u8,
+    pub world: World,
+    pub uuid: String,
+    pub entity_id: i32,
+    pub game_mode: u8,
     pub scores: Scores,
 }
 
@@ -446,26 +446,6 @@ impl Bot<'_> {
         let packet = client::ClientSettings::default().serialize(self.cmp())?;
         self.tcp.tx.send(packet).await?;
         Ok(())
-    }
-
-    pub fn username(&self) -> &str {
-        self.username
-    }
-
-    pub fn entity_id(&self) -> i32 {
-        self.entity_id
-    }
-
-    pub fn uuid(&self) -> &str {
-        &self.uuid
-    }
-
-    pub fn game_mode(&self) -> u8 {
-        self.game_mode
-    }
-
-    pub fn world(&self) -> &World {
-        &self.world
     }
 
     fn cmp(&self) -> i32 {
