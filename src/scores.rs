@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use gami_mc_protocol::{
     packets::play::server::{CreateTeam, FriendlyFire, ScoreboardKind},
-    registry::Color,
+    registry::TextColor,
 };
 
 #[derive(Default, Debug)]
@@ -39,7 +39,7 @@ pub struct Team {
     pub suffix: String,
     pub friendly_fire: FriendlyFire,
     pub nametag_visibility: String,
-    pub color: Color,
+    pub color: TextColor,
 }
 
 impl From<&CreateTeam> for Team {
