@@ -14,7 +14,7 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
 use crate::scores::{Objective, Scores, Team};
 use crate::stream::Stream;
-use crate::World;
+use crate::{Inventory, World};
 
 pub struct BotBuilder {
     username: String,
@@ -117,6 +117,7 @@ impl BotBuilder {
                 entity_id: entity_id.unwrap(),
                 game_mode: game_mode.unwrap(),
                 scores: Scores::default(),
+                inventory: Inventory::default(),
             };
 
             bot.tcp.listen(writer, rx);
@@ -207,6 +208,7 @@ pub struct Bot<'a> {
     pub username: &'a String,
     tcp: Stream,
     pub events: &'a EventHandlers,
+    pub inventory: Inventory,
     pub world: World,
     pub uuid: String,
     pub entity_id: i32,
@@ -381,6 +383,15 @@ impl Bot<'_> {
                         "Disconnected from server: {:?}",
                         data.reason
                     ));
+                }
+
+                Packets::SetSlot(data) => {
+                    if data.window_id == 0 {
+                        match data.slot {
+                            -1 => self.inventory.carried = data.item,
+                            i => self.inventory.slots[i as usize] = data.item,
+                        };
+                    }
                 }
 
                 _ => {}
