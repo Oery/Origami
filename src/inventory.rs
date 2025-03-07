@@ -30,7 +30,7 @@ impl Inventory {
     }
 
     pub fn main_hand(&self) -> &Option<Item> {
-        self.slots
+        self.hotbar()
             .get(self.main_hand as usize)
             .expect("Index out of bounds")
     }
