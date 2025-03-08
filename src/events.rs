@@ -24,6 +24,7 @@ pub struct EventHandlers {
     bed_handlers: Vec<EventHandler<play::server::Bed>>,
     animation_handlers: Vec<EventHandler<play::server::Animation>>,
     collect_handlers: Vec<EventHandler<play::server::Collect>>,
+    spawn_player_handlers: Vec<EventHandler<play::server::SpawnPlayer>>,
     spawn_mob_handlers: Vec<EventHandler<play::server::SpawnMob>>,
     spawn_entity_painting_handlers: Vec<EventHandler<play::server::SpawnEntityPainting>>,
     spawn_entity_experience_orb_handlers: Vec<EventHandler<play::server::SpawnEntityExperienceOrb>>,
@@ -169,6 +170,15 @@ where
 {
     fn register(self, events: &mut EventHandlers) {
         events.collect_handlers.push(Box::new(self));
+    }
+}
+
+impl<F> PacketHandler<play::server::SpawnPlayer> for F
+where
+    F: Fn(&Context<play::server::SpawnPlayer>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.spawn_player_handlers.push(Box::new(self));
     }
 }
 
@@ -409,6 +419,7 @@ impl Dispatchable for Packets {
             Self::Bed(payload) => bot.events.dispatch(payload, bot),
             Self::Animation(payload) => bot.events.dispatch(payload, bot),
             Self::Collect(payload) => bot.events.dispatch(payload, bot),
+            Self::SpawnPlayer(payload) => bot.events.dispatch(payload, bot),
             Self::SpawnMob(payload) => bot.events.dispatch(payload, bot),
             Self::SpawnEntityPainting(payload) => bot.events.dispatch(payload, bot),
             Self::SpawnEntityExperienceOrb(payload) => bot.events.dispatch(payload, bot),
@@ -529,6 +540,14 @@ impl Dispatchable for Context<'_, '_, play::server::Animation> {
 impl Dispatchable for Context<'_, '_, play::server::Collect> {
     fn dispatch_packet_event(&self, bot: &Bot) {
         for event in &bot.events.collect_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::SpawnPlayer> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.spawn_player_handlers {
             event(self);
         }
     }

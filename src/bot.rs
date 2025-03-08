@@ -287,6 +287,11 @@ impl Bot<'_> {
                 //         pitch: data.pitch,
                 //     });
                 // }
+                Packets::SpawnPlayer(player) => {
+                    let entity = EntityKind::from(&player);
+                    self.world.entities.insert(entity.id(), entity);
+                }
+
                 Packets::SpawnObject(object) => {
                     let entity = EntityKind::from(&object);
                     self.world.entities.insert(entity.id(), entity);
