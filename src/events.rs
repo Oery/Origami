@@ -49,6 +49,7 @@ pub struct EventHandlers {
     scoreboard_display_handlers: Vec<EventHandler<play::server::ScoreboardDisplay>>,
     teams_handlers: Vec<EventHandler<play::server::Teams>>,
     set_slot_handlers: Vec<EventHandler<play::server::SetSlot>>,
+    entity_equipment_handlers: Vec<EventHandler<play::server::EntityEquipment>>,
 }
 
 impl EventHandlers {
@@ -400,6 +401,15 @@ where
     }
 }
 
+impl<F> PacketHandler<play::server::EntityEquipment> for F
+where
+    F: Fn(&Context<play::server::EntityEquipment>) + 'static,
+{
+    fn register(self, events: &mut EventHandlers) {
+        events.entity_equipment_handlers.push(Box::new(self));
+    }
+}
+
 pub trait Dispatchable {
     fn dispatch_packet_event(&self, bot: &Bot);
 }
@@ -740,6 +750,14 @@ impl Dispatchable for Context<'_, '_, play::server::Teams> {
 impl Dispatchable for Context<'_, '_, play::server::SetSlot> {
     fn dispatch_packet_event(&self, bot: &Bot) {
         for event in &bot.events.set_slot_handlers {
+            event(self);
+        }
+    }
+}
+
+impl Dispatchable for Context<'_, '_, play::server::EntityEquipment> {
+    fn dispatch_packet_event(&self, bot: &Bot) {
+        for event in &bot.events.entity_equipment_handlers {
             event(self);
         }
     }

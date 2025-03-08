@@ -399,6 +399,12 @@ impl Bot<'_> {
                     }
                 }
 
+                Packets::EntityEquipment(data) => {
+                    if self.entity_id == data.entity_id {
+                        self.inventory.armor_slots_mut()[data.slot as usize] = Some(data.item);
+                    }
+                }
+
                 _ => {}
             }
         }
