@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use gami_mc_protocol::{
     packets::play::server::{CreateTeam, FriendlyFire, ScoreboardKind},
@@ -7,19 +8,19 @@ use gami_mc_protocol::{
 
 #[derive(Default, Debug)]
 pub struct Scores {
-    pub objectives: HashMap<String, Objective>,
-    pub teams: HashMap<String, Team>,
-    pub below_name: Option<String>,
-    pub player_list: Option<String>,
-    pub sidebar: Option<String>,
-    pub team_sidebar: Option<String>,
+    pub objectives: HashMap<Rc<str>, Objective>,
+    pub teams: HashMap<Rc<str>, Team>,
+    pub below_name: Option<Rc<str>>,
+    pub player_list: Option<Rc<str>>,
+    pub sidebar: Option<Rc<str>>,
+    pub team_sidebar: Option<Rc<str>>,
 }
 
 #[derive(Default, Debug)]
 pub struct Objective {
     pub display_name: String,
     pub kind: ScoreboardKind,
-    pub scores: HashMap<String, i32>,
+    pub scores: HashMap<Rc<str>, i32>,
 }
 
 impl Objective {
