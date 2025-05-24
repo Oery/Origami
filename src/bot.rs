@@ -7,7 +7,6 @@ use gami_mc_protocol::packets::{self, play::*, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
 use gami_mc_protocol::registry::tcp::State;
 use gami_mc_protocol::registry::EntityKind;
-use tokio::sync::mpsc;
 use tokio::time;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
@@ -64,17 +63,21 @@ impl BotBuilder {
                 }
             };
 
+            stream.set_nodelay(true)?;
+
+            println!("Setting protocol...");
             self.set_protocol(&mut stream).await?;
+
+            println!("Logging in...");
             self.login(&mut stream).await?;
 
-            let (reader, writer) = stream.into_split();
-            let (tx, rx) = mpsc::channel::<Vec<u8>>(100);
-
-            let mut stream = Stream::new(reader, tx);
+            let mut stream = Stream::new(stream);
             let mut packets = vec![];
             let mut uuid = String::new();
             let mut entity_id = None;
             let mut game_mode = None;
+
+            println!("Waiting for entity spawn...");
 
             while entity_id.is_none() {
                 let mut new_packets = stream.read_packets().await?;
@@ -120,7 +123,6 @@ impl BotBuilder {
                 inventory: Inventory::default(),
             };
 
-            bot.tcp.listen(writer, rx);
             bot.handle_packets(packets).await?;
 
             if let Err(e) = bot.run().await {
@@ -413,22 +415,17 @@ impl Bot<'_> {
     }
 
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
-        let packet = packets::play::client::ClientCommand::respawn().serialize(self.cmp())?;
-        self.tcp.tx.send(packet).await?;
+        let packet = packets::play::client::ClientCommand::respawn();
+        self.tcp.send_packet(&packet).await?;
         Ok(())
     }
 
     pub fn chat(&self, message: &str) {
-        let Ok(packet) = client::Chat::new(message).serialize(self.cmp()) else {
-            eprintln!("[ERROR] bot.chat() : Failed to serialize chat packet");
-            return;
-        };
+        let packet = packets::play::client::Chat::new(message);
 
-        // TODO: Improve this
-        let tx = self.tcp.tx.clone();
-        tokio::spawn(async move {
-            tx.send(packet).await.unwrap();
-        });
+        if let Err(e) = self.tcp.send_packet_sync(&packet) {
+            eprintln!("[ERROR] Failed to send chat message: {:?}", e);
+        };
     }
 
     pub fn attack_entity(&self, id: i32) {
@@ -452,26 +449,17 @@ impl Bot<'_> {
             return;
         }
 
-        let Ok(packet) = client::UseEntity::attack(entity.id()).serialize(self.cmp()) else {
-            eprintln!("[ERROR] Failed to serialize packet");
-            return;
-        };
+        let packet = packets::play::client::UseEntity::attack(id);
 
-        // TODO: Improve this
-        let tx = self.tcp.tx.clone();
-        tokio::spawn(async move {
-            tx.send(packet).await.unwrap();
-        });
+        if let Err(e) = self.tcp.send_packet_sync(&packet) {
+            eprintln!("[ERROR] Failed to send attack packet: {:?}", e);
+        };
     }
 
     async fn send_settings(&mut self) -> anyhow::Result<()> {
-        let packet = client::ClientSettings::default().serialize(self.cmp())?;
-        self.tcp.tx.send(packet).await?;
+        let packet = client::ClientSettings::default();
+        self.tcp.send_packet(&packet).await?;
         Ok(())
-    }
-
-    fn cmp(&self) -> i32 {
-        self.tcp.compression_threshold
     }
 
     // EVENTS HANDLERS
