@@ -389,7 +389,9 @@ impl Bot<'_> {
                 }
 
                 Packets::SetSlot(data) => {
-                    if data.window_id == 0 {
+                    const INVENTORY: i8 = 0;
+
+                    if data.window_id == INVENTORY {
                         match data.slot {
                             -1 => self.inventory.carried = data.item,
                             i => self.inventory.slots[i as usize] = data.item,
