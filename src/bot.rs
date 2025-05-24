@@ -5,7 +5,7 @@ use gami_mc_protocol::packets::play::server::{
 };
 use gami_mc_protocol::packets::{self, play::*, ServerPacket};
 use gami_mc_protocol::packets::{Packet, Packets};
-use gami_mc_protocol::registry::tcp::States;
+use gami_mc_protocol::registry::tcp::State;
 use gami_mc_protocol::registry::EntityKind;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -141,7 +141,7 @@ impl BotBuilder {
             protocol_version: 47,
             server_host: self.host.clone(),
             server_port: self.port,
-            next_state: States::Login,
+            next_state: State::Login,
         };
 
         stream.write_all(&packet.serialize(-1)?).await?;
