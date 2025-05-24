@@ -2,33 +2,62 @@
 
 A programmable Minecraft client written in pure Rust. It can be used to build agents/bots with low memory and CPU footprint. It features a simple API that allows developers to easily create custom behaviors for their bots while still having access to a more powerful packet interface.
 
-## Features
+## Example
 
-- Low memory and CPU footprint
-- Simple yet powerful API
-- Event-driven architecture
-- Asynchronous I/O
-- Easy to use
+```rust
+#[tokio::main]
+async fn main() {
+    // Create the bot configuration
+    let mut bot = BotBuilder::new();
 
-## Goals
+    // Run when bot connects to a server
+    bot.on_connect(|_ctx: &Context<()>| {
+        println!("Bot Connected!");
+        ctx.bot.chat(&format!("Hey!, I'm {}", ctx.bot.username));
+    });
 
-My goal is to build a client performant and feature-rich enough to enable developers to build AIs that can be used to create new minigames / revive
+    // Run if the bot get disconnected
+    bot.on_disconnect(|ctx: &Context<KickDisconnect>| {
+        println!("Bot Disconnected: {:?}", ctx.payload.reason);
+    });
 
-## Roadmap
+    // Run when the bot receives a chat message
+    bot.on_chat(|ctx: &Context<Chat>| {
+        if ctx.payload.message.contains("wolf") {
+            // Iterate over all the entities in the bot's memory
+            for entity in ctx.bot.world.entities.values() {
+                if let EntityKind::Wolf(wolf) = entity {
+                    println!("Name: {} - Color: {}", wolf.name_tag, wolf.collar_color);
+                }
+            }
+        }
+    });
 
-#### 1.0.0
+    // Run on every tick -> every 50ms
+    bot.on_tick(|ctx: &Context<()>| {
+        println!("Clock ticked");
+    });
 
-This release will focus on the 1.8.9 version of Minecraft (My protocol implementation only supports this version).
+    // Run when the packet provided in Context<T> is received
+    bot.on_packet(|ctx: &Context<SpawnPlayer>| {
+        dbg!(&ctx.payload.player_uuid);
+    });
+
+    // Run the bot
+    bot.run().await?;
+
+    Ok(())
+}
+```
+
+#### Target Features
 
 - [x] Login
-- [x] Packet handling
-- [x] Sys Events
-- [ ] User Events (50%)
-- [ ] Entities (0%)
-- [ ] Inventory And Storage (0%)
-- [ ] World (0%)
-- [ ] Physics (0%)
-- [ ] Behavior checks for actions (0%)
+- [x] Chat
+- [x] Event System
+- [x] Inventory
+- [ ] World
+- [ ] Physics Engine
 
 #### Extra Features
 
