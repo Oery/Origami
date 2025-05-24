@@ -414,6 +414,11 @@ impl Bot<'_> {
         Ok(())
     }
 
+    // TODO: Downcast to inner Entity
+    pub fn entity(&self) -> &EntityKind {
+        &self.world.entities[&self.entity_id]
+    }
+
     pub async fn respawn(&mut self) -> anyhow::Result<()> {
         let packet = packets::play::client::ClientCommand::respawn();
         self.tcp.send_packet(&packet).await?;
