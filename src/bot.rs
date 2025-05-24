@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::time::Duration;
 
 use gami_mc_protocol::packets::play::server::{
@@ -11,7 +12,7 @@ use tokio::time;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::events::{Context, Dispatchable, EventHandlers, PacketHandler};
-use crate::scores::{Objective, Scores, Team};
+use crate::scores::{Objective, Scores};
 use crate::stream::Stream;
 use crate::{Inventory, World};
 
@@ -314,13 +315,17 @@ impl Bot<'_> {
                     ScoreboardObjectiveAction::Add(action_data) => {
                         self.scores
                             .objectives
-                            .insert(data.objective, Objective::new(action_data.kind));
+                            .insert(data.objective.into(), Objective::new(action_data.kind));
                     }
+
                     ScoreboardObjectiveAction::Remove => {
-                        self.scores.objectives.remove(&data.objective);
+                        self.scores
+                            .objectives
+                            .remove::<Rc<str>>(&data.objective.into());
                     }
+
                     ScoreboardObjectiveAction::UpdateDisplayText(action_data) => {
-                        if let Some(objective) = self.scores.objectives.get_mut(&data.objective) {
+                        if let Some(objective) = self.scores.get_objective(data.objective) {
                             objective.display_name = action_data.display_name;
                             objective.kind = action_data.kind;
                         }
@@ -330,13 +335,16 @@ impl Bot<'_> {
                 Packets::ScoreboardUpdate(data) => {
                     if data.objective.is_empty() {
                         self.scores.objectives.values_mut().for_each(|obj| {
-                            obj.scores.remove(&data.player);
+                            obj.scores.remove(data.player.as_str());
                         });
-                    } else if let Some(objective) = self.scores.objectives.get_mut(&data.objective)
-                    {
+
+                        continue;
+                    }
+
+                    if let Some(obj) = self.scores.objectives.get_mut(data.objective.as_str()) {
                         match data.value {
-                            Some(value) => objective.scores.insert(data.player, value),
-                            None => objective.scores.remove(&data.player),
+                            Some(value) => obj.scores.insert(data.player.into(), value),
+                            None => obj.scores.remove::<Rc<str>>(&data.player.into()),
                         };
                     }
                 }
@@ -344,7 +352,7 @@ impl Bot<'_> {
                 Packets::ScoreboardDisplay(data) => {
                     let value = match data.name.is_empty() {
                         true => None,
-                        false => Some(data.name),
+                        false => Some(data.name.into()),
                     };
 
                     match data.position {
@@ -356,31 +364,19 @@ impl Bot<'_> {
                 }
 
                 Packets::Teams(data) => match data.action {
-                    TeamsAction::CreateTeam(team) => {
-                        self.scores.teams.insert(data.name, Team::from(&team));
-                    }
-                    TeamsAction::RemoveTeam => {
-                        self.scores.teams.remove(&data.name);
-                    }
-                    TeamsAction::UpdateTeam(team) => {
-                        if let Some(prev_team) = self.scores.teams.get_mut(&data.name) {
-                            prev_team.display_name = team.display_name.clone();
-                            prev_team.prefix = team.prefix.clone();
-                            prev_team.suffix = team.suffix.clone();
-                            prev_team.friendly_fire = team.friendly_fire;
-                            prev_team.nametag_visibility = team.nametag_visibility.clone();
-                            prev_team.color = team.color;
+                    TeamsAction::CreateTeam(team) => self.scores.create_team(data.name, &team),
+                    TeamsAction::RemoveTeam => self.scores.remove_team(data.name),
+                    TeamsAction::UpdateTeam(team) => self.scores.update_team(data.name, &team),
+
+                    TeamsAction::AddPlayers(action_data) => {
+                        if let Some(team) = self.scores.teams.get_mut(data.name.as_str()) {
+                            team.players.extend(action_data.players.iter().cloned());
                         }
                     }
-                    TeamsAction::AddPlayers(players) => {
-                        if let Some(team) = self.scores.teams.get_mut(&data.name) {
-                            team.players.extend(players.players.iter().cloned());
-                        }
-                    }
+
                     TeamsAction::RemovePlayers(players) => {
-                        if let Some(team) = self.scores.teams.get_mut(&data.name) {
-                            team.players
-                                .retain(|player| !players.players.contains(player));
+                        if let Some(team) = self.scores.get_team(data.name) {
+                            team.remove_players(&players.players);
                         }
                     }
                 },
